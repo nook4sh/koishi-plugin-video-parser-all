@@ -9,6 +9,57 @@ const LRUCache = LruCacheModule.LRUCache || LruCacheModule
 
 export const name = 'video-parser-all'
 
+const platformNames = [
+  'bilibili',
+  'douyin',
+  'kuaishou',
+  'xiaohongshu',
+  'weibo',
+  'xigua',
+  'youtube',
+  'tiktok',
+  'acfun',
+  'zhihu',
+  'weishi',
+  'huya',
+  'haokan',
+  'meipai',
+  'twitter',
+  'instagram',
+  'doubao',
+] as const
+
+type PlatformName = typeof platformNames[number]
+
+const platformLabels: Record<PlatformName, string> = {
+  bilibili: '哔哩哔哩',
+  douyin: '抖音',
+  kuaishou: '快手',
+  xiaohongshu: '小红书',
+  weibo: '微博',
+  xigua: '西瓜视频',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  acfun: 'AcFun',
+  zhihu: '知乎',
+  weishi: '微视',
+  huya: '虎牙',
+  haokan: '好看视频',
+  meipai: '美拍',
+  twitter: 'Twitter/X',
+  instagram: 'Instagram',
+  doubao: '豆包',
+}
+
+function createPlatformSwitchSchema(defaultValue: boolean) {
+  return Object.fromEntries(
+    platformNames.map(platform => [
+      platform,
+      Schema.boolean().default(defaultValue).description(platformLabels[platform]),
+    ])
+  ) as Record<PlatformName, Schema<boolean>>
+}
+
 export const Config = Schema.intersect([
   Schema.object({
     enable: Schema.boolean().default(true).description('是否启用视频解析插件'),
@@ -54,48 +105,16 @@ export const Config = Schema.intersect([
   }).description('去重设置'),
 
   Schema.object({
+    platformUrlParsing: Schema.object(createPlatformSwitchSchema(true)).description('各平台 URL 解析开关，关闭后该平台链接不会被自动解析，parse 指令也不会解析'),
+  }).description('平台解析开关'),
+
+  Schema.object({
     primaryApiUrl: Schema.string().default('https://api.bugpk.com/api/short_videos').description('主 API 地址'),
     backupApiUrl: Schema.string().default('https://api.bugpk.com/api/svparse').description('备用主 API 地址（仅支持抖音/小红书/ins/即梦）'),
-    platformDedicatedFirst: Schema.object({
-      bilibili: Schema.boolean().default(false).description('哔哩哔哩'),
-      douyin: Schema.boolean().default(false).description('抖音'),
-      kuaishou: Schema.boolean().default(false).description('快手'),
-      xiaohongshu: Schema.boolean().default(false).description('小红书'),
-      weibo: Schema.boolean().default(false).description('微博'),
-      xigua: Schema.boolean().default(false).description('西瓜视频'),
-      youtube: Schema.boolean().default(false).description('YouTube'),
-      tiktok: Schema.boolean().default(false).description('TikTok'),
-      acfun: Schema.boolean().default(false).description('AcFun'),
-      zhihu: Schema.boolean().default(false).description('知乎'),
-      weishi: Schema.boolean().default(false).description('微视'),
-      huya: Schema.boolean().default(false).description('虎牙'),
-      haokan: Schema.boolean().default(false).description('好看视频'),
-      meipai: Schema.boolean().default(false).description('美拍'),
-      twitter: Schema.boolean().default(false).description('Twitter/X'),
-      instagram: Schema.boolean().default(false).description('Instagram'),
-      doubao: Schema.boolean().default(false).description('豆包'),
-    }).description('各平台独立开关：是否优先使用专属 API'),
+    platformDedicatedFirst: Schema.object(createPlatformSwitchSchema(false)).description('各平台独立开关：是否优先使用专属 API'),
     customApis: Schema.array(
       Schema.object({
-        platform: Schema.union([
-          Schema.const('bilibili').description('哔哩哔哩'),
-          Schema.const('douyin').description('抖音'),
-          Schema.const('kuaishou').description('快手'),
-          Schema.const('xiaohongshu').description('小红书'),
-          Schema.const('weibo').description('微博'),
-          Schema.const('xigua').description('西瓜视频'),
-          Schema.const('youtube').description('YouTube'),
-          Schema.const('tiktok').description('TikTok'),
-          Schema.const('acfun').description('AcFun'),
-          Schema.const('zhihu').description('知乎'),
-          Schema.const('weishi').description('微视'),
-          Schema.const('huya').description('虎牙'),
-          Schema.const('haokan').description('好看视频'),
-          Schema.const('meipai').description('美拍'),
-          Schema.const('twitter').description('Twitter/X'),
-          Schema.const('instagram').description('Instagram'),
-          Schema.const('doubao').description('豆包'),
-        ]).description('选择平台'),
+        platform: Schema.union(platformNames.map(platform => Schema.const(platform).description(platformLabels[platform]))).description('选择平台'),
         apiUrl: Schema.string().description('API 地址'),
       })
     ).default([]).description('自定义平台专属 API 地址，留空则使用内置默认专属 API'),
@@ -545,6 +564,21 @@ export function apply(ctx: Context, config: any) {
     return { apiUrl, dedicatedFirst }
   }
 
+  function isPlatformUrlParsingEnabled(type: string): boolean {
+    return config.platformUrlParsing?.[type] ?? true
+  }
+
+  function filterEnabledMatches(matches: LinkMatch[]): LinkMatch[] {
+    const enabledMatches = matches.filter(match => isPlatformUrlParsingEnabled(match.type))
+    const disabledMatches = matches.filter(match => !isPlatformUrlParsingEnabled(match.type))
+
+    for (const match of disabledMatches) {
+      debugLog('INFO', `平台 ${match.type} 的 URL 解析已关闭，跳过链接: ${match.url}`)
+    }
+
+    return enabledMatches
+  }
+
   async function resolveShortUrl(url: string): Promise<string> {
     try {
       const res = await http.get(url, {
@@ -789,6 +823,12 @@ export function apply(ctx: Context, config: any) {
   }
 
   async function flush(session: any, matches: LinkMatch[]) {
+    matches = filterEnabledMatches(matches)
+    if (!matches.length) {
+      debugLog('INFO', '所有检测到的链接均被平台解析开关过滤')
+      return
+    }
+
     debugLog('INFO', `开始解析 ${matches.length} 个链接`)
     
     const items: { text: string; parsed: ParsedData }[] = []
@@ -923,7 +963,7 @@ export function apply(ctx: Context, config: any) {
     if (session.elements?.some(elem => elem.type === 'file' || elem.type === 'folder')) return
     if (session.selfId === session.userId) return
 
-    const matches = extractAllUrlsFromMessage(session)
+    const matches = filterEnabledMatches(extractAllUrlsFromMessage(session))
     if (!matches.length) return
 
     debugLog('INFO', `检测到 ${matches.length} 个链接，开始处理`)
@@ -950,6 +990,12 @@ export function apply(ctx: Context, config: any) {
       await sendWithTimeout(session, texts.invalidLinkText)
       return
     }
+
+    const enabledMatches = filterEnabledMatches(matches)
+    if (!enabledMatches.length) {
+      await sendWithTimeout(session, texts.unsupportedPlatformText)
+      return
+    }
     
     if (config.showWaitingTip) {
       try { 
@@ -957,7 +1003,7 @@ export function apply(ctx: Context, config: any) {
       } catch {}
     }
     
-    await flush(session, matches)
+    await flush(session, enabledMatches)
   })
 
   const tempCleanupInterval = setInterval(async () => {

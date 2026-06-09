@@ -59,6 +59,11 @@ This is a **multi-platform video/image parsing plugin** developed for the Koishi
 | `platformDedicatedFirst` | object | 各平台均为 `false` | 各平台独立开关：是否优先使用平台专属 API。对象键为平台标识（英文），值为布尔值。支持的键：`bilibili`（哔哩哔哩）、`douyin`（抖音）、`kuaishou`（快手）、`xiaohongshu`（小红书）、`weibo`（微博）、`xigua`（西瓜视频）、`youtube`（YouTube）、`tiktok`（TikTok）、`acfun`（AcFun）、`zhihu`（知乎）、`weishi`（微视）、`huya`（虎牙）、`haokan`（好看视频）、`meipai`（美拍）、`twitter`（Twitter/X）、`instagram`（Instagram）、`doubao`（豆包） |
 | `customApis` | array | [] | 自定义平台专属 API 列表。每项包含：`platform`（平台类型）、`apiUrl`（API 地址）。可覆盖内置默认专属 API |
 
+### 平台解析开关
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `platformUrlParsing` | object | 各平台均为 `true` | 各平台 URL 解析开关。关闭某个平台后，该平台链接不会被自动解析，`parse` 指令也不会解析。对象键为平台标识（英文），值为布尔值。支持的键同 `platformDedicatedFirst` |
+
 ### 错误与重试设置
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
