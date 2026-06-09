@@ -1,7 +1,7 @@
 {
-  "name": "koishi-plugin-video-parser-all",
+  "name": "koishi-plugin-video-parser-all-nook4sh",
   "description": "Koishi 全平台视频解析插件，支持抖音/快手/B站/微博/小红书/剪映/YouTube/TikTok等20+平台",
-  "version": "1.2.2",
+  "version": "1.0.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -65,14 +65,20 @@
     "@koishijs/plugin-console": "^5.30.4",
     "koishi": "^4.18.7"
   },
+  "koishi": {
+    "description": {
+      "zh": "全平台视频解析插件，支持按平台开关 URL 解析。",
+      "en": "Multi-platform video parser with per-platform URL parsing switches."
+    }
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Minecraft-1314/koishi-plugin-video-parser-all.git"
+    "url": "git+https://github.com/nook4sh/koishi-plugin-video-parser-all.git"
   },
   "bugs": {
-    "url": "https://github.com/Minecraft-1314/koishi-plugin-video-parser-all/issues"
+    "url": "https://github.com/nook4sh/koishi-plugin-video-parser-all/issues"
   },
-  "homepage": "https://github.com/Minecraft-1314/koishi-plugin-video-parser-all#readme",
+  "homepage": "https://github.com/nook4sh/koishi-plugin-video-parser-all#readme",
   "engines": {
     "node": ">=16.0.0"
   }
